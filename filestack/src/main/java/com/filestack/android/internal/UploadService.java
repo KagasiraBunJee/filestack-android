@@ -21,12 +21,15 @@ import android.support.v4.app.ServiceCompat;
 import android.support.v4.content.LocalBroadcastManager;
 
 import com.filestack.FileLink;
+import com.filestack.Progress;
 import com.filestack.Sources;
 import com.filestack.StorageOptions;
 import com.filestack.android.FsConstants;
 import com.filestack.android.R;
 import com.filestack.android.Selection;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +38,15 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import io.reactivex.Flowable;
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
+import io.reactivex.Single;
+import io.reactivex.SingleSource;
+import io.reactivex.functions.Action;
+import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
+import io.reactivex.subscribers.DisposableSubscriber;
 import okhttp3.internal.Internal;
 
 /**
@@ -49,6 +61,7 @@ public class UploadService extends Service {
     private static final String NOTIFY_CHANNEL_UPLOAD = "uploadsChannel";
 
     private Executor executor = Executors.newSingleThreadExecutor();
+    Flowable<Progress<FileLink>> upload;
 
     private NotificationManager notificationManager;
     private int notificationId;
@@ -92,7 +105,7 @@ public class UploadService extends Service {
                 stopSelf();
             }
         });
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     private void uploadFiles(List<Selection> selections, StorageOptions storeOpts) {
@@ -102,19 +115,52 @@ public class UploadService extends Service {
         for (Selection item : selections) {
             String name = item.getName();
 
-            sendProgressNotification(i, total, name);
-            FileLink fileLink = upload(item, storeOpts);
+//            sendProgressNotification(i, total, name);
+
+            uploadAsync(item, storeOpts);
+//            FileLink fileLink = upload(item, storeOpts);
 
             // If upload fails, decrease total count and show error notification
-            if (fileLink == null) {
-                sendErrorNotification(item.getName());
-                total--;
-            } else {
-                i++;
-            }
+//            if (fileLink == null) {
+//                sendErrorNotification(item.getName());
+//                total--;
+//            } else {
+//                i++;
+//            }
+//
+//            sendProgressNotification(i, total, name);
+//            sendBroadcast(item, fileLink);
+        }
+    }
 
-            sendProgressNotification(i, total, name);
-            sendBroadcast(item, fileLink);
+    private void uploadAsync(Selection selection, StorageOptions baseOptions) {
+        System.out.println("start upload");
+        try {
+            String provider = selection.getProvider();
+            String path = selection.getPath();
+            Uri uri = selection.getUri();
+            final int size = selection.getSize();
+            final String name = selection.getName();
+            final String mimeType = selection.getMimeType();
+            StorageOptions options = baseOptions.newBuilder()
+                    .filename(name)
+                    .mimeType(mimeType)
+                    .build();
+            InputStream input = getContentResolver().openInputStream(uri);
+
+            Util.getClient().uploadAsync(input, size, false, options).doOnNext(new Consumer<Progress<FileLink>>() {
+                @Override
+                public void accept(Progress<FileLink> progress) throws Exception {
+                    System.out.printf("%f%% uploaded %s\n", progress.getPercent(), name);
+                    if (progress.getData() != null) {
+                        FileLink file = progress.getData();
+                        String handle = file.getHandle();
+                        String url = ""+name;
+                    }
+                }
+            }).subscribe();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -207,7 +253,15 @@ public class UploadService extends Service {
         if (fileLink == null) {
             intent.putExtra(FsConstants.EXTRA_STATUS, FsConstants.STATUS_FAILED);
         } else {
-            intent.putExtra(FsConstants.EXTRA_STATUS, FsConstants.STATUS_COMPLETE);
+            try {
+                System.out.println(fileLink.getContent().toString());
+                intent.putExtra(FsConstants.EXTRA_STATUS, FsConstants.STATUS_COMPLETE);
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                System.out.println("failed");
+            }
+
         }
         intent.putExtra(FsConstants.EXTRA_FILE_LINK, fileLink);
 
