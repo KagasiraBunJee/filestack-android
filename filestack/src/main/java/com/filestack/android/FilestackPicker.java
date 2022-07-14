@@ -87,10 +87,13 @@ public class FilestackPicker {
         /**
          * Sets configuration object containing all of your account info (api key, policy).
          * This param is required.
-         * @param config - configuration instance
+         * @param apikey - filestack apikey
+         * @param returnUrl - app return url
+         * @param policy - Filestack encoded policy
+         * @param signature - Filestack encoded signature
          */
-        public Builder config(Config config) {
-            this.config = config;
+        public Builder config(String apikey, String returnUrl, String policy, String signature) {
+            this.config = new Config(apikey, returnUrl, policy, signature);
             return this;
         }
 
