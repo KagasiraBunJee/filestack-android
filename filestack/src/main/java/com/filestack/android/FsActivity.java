@@ -40,6 +40,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.filestack.CloudResponse;
@@ -100,6 +101,7 @@ public class FsActivity extends AppCompatActivity implements
     private DrawerLayout drawer;
     private String selectedSource;
     private boolean shouldCheckAuth;
+    private boolean isUploadingStarted = false;
     private NavigationView nav;
 
     private boolean allowMultipleFiles;
@@ -336,6 +338,21 @@ public class FsActivity extends AppCompatActivity implements
     @Override
     public void onEmptyChanged(boolean isEmpty) {
         invalidateOptionsMenu();
+        if (!isEmpty && !isUploadingStarted) {
+            ProgressBar toolbar = findViewById(R.id.progress_bar);
+            toolbar.setVisibility(View.VISIBLE);
+            toolbar.setProgress(50);
+//            isUploadingStarted = true;
+//            Intent activityIntent = getIntent();
+//            ArrayList<Selection> selections = Util.getSelectionSaver().getItems();
+//            StorageOptions storeOpts = (StorageOptions) activityIntent
+//                    .getSerializableExtra(FsConstants.EXTRA_STORE_OPTS);
+//            Intent uploadIntent = new Intent(this, UploadService.class);
+//            uploadIntent.putExtra(FsConstants.EXTRA_STORE_OPTS, storeOpts);
+//            uploadIntent.putExtra(FsConstants.EXTRA_SELECTION_LIST, selections);
+//            ContextCompat.startForegroundService(this, uploadIntent);
+
+        }
     }
 
     @Override
