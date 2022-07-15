@@ -40,4 +40,7 @@
     <string name="filestack__notify_channel_upload_description">Progress updates for uploads</string>
 
     <string name="filestack__redirect_uri" translatable="false">filestack://done</string>
+    <string name="filestack__title_activity_upload_progress">UploadProgressActivity</string>
+    <string name="filestack__cancel_upload">Cancel</string>
+    <string name="filestack__title_upload">Filestack Upload</string>
 </resources>

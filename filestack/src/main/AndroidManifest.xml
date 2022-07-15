@@ -1,35 +1,40 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.filestack.android">
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.filestack.android" >
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <application
         android:allowBackup="true"
-        android:supportsRtl="true">
-
+        android:supportsRtl="true" >
+        <activity
+            android:name=".UploadProgressActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:exported="false"
+            android:label="@string/filestack__title_activity_upload_progress"
+            android:theme="@style/Theme.Filestackandroid.Fullscreen" />
         <activity
             android:name=".FsActivity"
-            android:launchMode="singleTop"
-            android:label="@string/filestack__picker_title"
             android:exported="true"
-            android:theme="@style/FilestackNoActionBar">
-
+            android:label="@string/filestack__picker_title"
+            android:launchMode="singleTop"
+            android:theme="@style/FilestackNoActionBar" >
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="filestack"/>
-            </intent-filter>
 
+                <data android:scheme="filestack" />
+            </intent-filter>
         </activity>
 
         <service
             android:name=".internal.UploadService"
-            android:exported="true"/>
-
+            android:exported="true" />
     </application>
 
 </manifest>

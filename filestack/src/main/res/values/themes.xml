@@ -1,0 +1,15 @@
+<resources>
+  <style name="Theme.Filestackandroid" parent="Theme.AppCompat.Light"/>
+    <style name="Theme.Filestackandroid.Fullscreen" parent="Theme.Filestackandroid">
+        <item name="android:actionBarStyle">
+            @style/Widget.Theme.Filestackandroid.ActionBar.Fullscreen
+        </item>
+        <item name="android:windowActionBarOverlay">true</item>
+        <item name="android:windowBackground">@null</item>
+    </style>
+
+    <style name="ThemeOverlay.Filestackandroid.FullscreenContainer" parent="">
+        <item name="fullscreenBackgroundColor">@color/light_blue_600</item>
+        <item name="fullscreenTextColor">@color/light_blue_A200</item>
+    </style>
+</resources>

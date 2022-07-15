@@ -402,10 +402,13 @@ public class FsActivity extends AppCompatActivity implements
             ContextCompat.startForegroundService(this, uploadIntent);
         }
 
-        Intent data = new Intent();
-        data.putExtra(FsConstants.EXTRA_SELECTION_LIST, selections);
-        setResult(RESULT_OK, data);
-        finish();
+        Intent uploadProgressIntent = new Intent(this, UploadProgressActivity.class);
+        uploadProgressIntent.putExtra("uploadMaxFiles", selections.size());
+        startActivityForResult(uploadProgressIntent, 0);
+//        Intent data = new Intent();
+//        data.putExtra(FsConstants.EXTRA_SELECTION_LIST, selections);
+//        setResult(RESULT_OK, data);
+//        finish();
     }
 
     private void showAboutDialog() {

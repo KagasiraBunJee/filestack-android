@@ -17,7 +17,7 @@ import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.filestack.Config;
+//import com.filestack.Config;
 import com.filestack.android.FilestackPicker;
 import com.filestack.android.FsActivity;
 import com.filestack.android.FsConstants;
@@ -81,11 +81,14 @@ public class MainActivity extends AppCompatActivity {
         String policy = sharedPref.getString("policy", null);
         String signature = sharedPref.getString("signature", null);
 
-        if (apiKey == null) {
-            Toast.makeText(this, R.string.error_no_api_key, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Config config = new Config(apiKey, getString(R.string.return_url), policy, signature);
+//        if (apiKey == null) {
+//            Toast.makeText(this, R.string.error_no_api_key, Toast.LENGTH_SHORT).show();
+//            return;
+//        }
+//        Config config = new Config(
+//                "AEHrSDUikTDqTbYuRTesYz",
+//                "eyJjYWxsIjogWyJyZWFkIiwgImNvbnZlcnQiLCAicGljayIsICJzdG9yZSJdLCAiZXhwaXJ5IjogMTY1NzkxMzkzMS4xNjM3MjcsICJtYXhTaXplIjogNTM2ODcwOTEyMH0=",
+//                "043c61bd9a5f326a3d5f07a54d258ba776374600aa7f4aa0bc590493b72a225a");
 
         Theme theme = new Theme.Builder()
                 .title(sharedPref.getString("theme_title", null))
@@ -94,13 +97,22 @@ public class MainActivity extends AppCompatActivity {
                 .textColor(sharedPref.getInt("theme_text", ContextCompat.getColor(this, R.color.text)))
                 .build();
 
+//        StorageOptions storeOpts = new StorageOptions.Builder()
+//                .location("s3")
+//                .build();
+
         FilestackPicker picker = new FilestackPicker.Builder()
-                .config(config)
+                .config(
+                        "AEHrSDUikTDqTbYuRTesYz",
+                        "",
+                        "eyJjYWxsIjogWyJyZWFkIiwgImNvbnZlcnQiLCAicGljayIsICJzdG9yZSJdLCAiZXhwaXJ5IjogMTY1NzkxMzkzMS4xNjM3MjcsICJtYXhTaXplIjogNTM2ODcwOTEyMH0=",
+                        "043c61bd9a5f326a3d5f07a54d258ba776374600aa7f4aa0bc590493b72a225a")
                 .sources(new ArrayList<>(sharedPref.getStringSet("upload_sources", Collections.<String>emptySet())))
                 .autoUploadEnabled(sharedPref.getBoolean("auto_upload", false))
                 .mimeTypes(mimeTypes)
                 .multipleFilesSelectionEnabled(sharedPref.getBoolean("allow_multiple_files", true))
                 .theme(theme)
+//                .storageOptions(storeOpts)
                 .build();
         picker.launch(this);
     }

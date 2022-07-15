@@ -1,18 +1,15 @@
 package com.filestack.android.internal;
 
 import android.annotation.TargetApi;
-import android.app.IntentService;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.JobIntentService;
 import android.support.v4.app.NotificationCompat;
@@ -24,11 +21,11 @@ import com.filestack.FileLink;
 import com.filestack.Progress;
 import com.filestack.Sources;
 import com.filestack.StorageOptions;
+import com.filestack.android.DataHashMap;
 import com.filestack.android.FsConstants;
 import com.filestack.android.R;
 import com.filestack.android.Selection;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -39,15 +36,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import io.reactivex.Flowable;
-import io.reactivex.Observable;
-import io.reactivex.ObservableSource;
-import io.reactivex.Single;
-import io.reactivex.SingleSource;
-import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
-import io.reactivex.functions.Function;
-import io.reactivex.subscribers.DisposableSubscriber;
-import okhttp3.internal.Internal;
 
 /**
  * If the auto upload option is left enabled, a user's selections will be sent to this service
@@ -56,6 +45,7 @@ import okhttp3.internal.Internal;
  * messages on the progress.
  * TODO Use async version of Java SDK upload so we can show incremental progress for large uploads
  */
+
 public class UploadService extends Service {
 
     private static final String NOTIFY_CHANNEL_UPLOAD = "uploadsChannel";
@@ -66,6 +56,13 @@ public class UploadService extends Service {
     private NotificationManager notificationManager;
     private int notificationId;
     private int errorNotificationId;
+
+    private ArrayList<DataHashMap> response = new ArrayList<>();
+
+    private int maxSize = 0;
+    private double currentSize = 0;
+    private int currentFile = 0;
+    private int maxFiles = 0;
 
     @Override
     public void onCreate() {
@@ -109,11 +106,13 @@ public class UploadService extends Service {
     }
 
     private void uploadFiles(List<Selection> selections, StorageOptions storeOpts) {
-        int total = selections.size();
-
-        int i = 0;
+        maxFiles = selections.size();
+        currentFile = 0;
+        currentSize = 0;
+        maxSize = selections.size();
+        sendBroadcastProgress(false);
         for (Selection item : selections) {
-            String name = item.getName();
+//            String name = item.getName();
 
 //            sendProgressNotification(i, total, name);
 
@@ -148,17 +147,30 @@ public class UploadService extends Service {
                     .build();
             InputStream input = getContentResolver().openInputStream(uri);
 
-            Util.getClient().uploadAsync(input, size, false, options).doOnNext(new Consumer<Progress<FileLink>>() {
+            FileLink file = Util.getClient().uploadAsync(input, size, false, options).doOnNext(new Consumer<Progress<FileLink>>() {
                 @Override
                 public void accept(Progress<FileLink> progress) throws Exception {
                     System.out.printf("%f%% uploaded %s\n", progress.getPercent(), name);
-                    if (progress.getData() != null) {
-                        FileLink file = progress.getData();
-                        String handle = file.getHandle();
-                        String url = ""+name;
-                    }
+                    currentSize = currentFile > 0 ? (currentFile - 1) + progress.getPercent() : progress.getPercent();
+                    sendBroadcastProgress(false);
                 }
-            }).subscribe();
+            }).blockingLast().getData();
+
+            DataHashMap data = new DataHashMap();
+            data.put("container", file.getContainer());
+            data.put("filename", file.getFilename());
+            data.put("mimetype", file.getMimeType());
+            data.put("size", file.getSize());
+            data.put("url", file.getUrl());
+            data.put("key", file.getKey());
+            response.add(data);
+            currentFile++;
+            if (currentFile == maxFiles - 1) {
+                sendBroadcastProgress(true);
+            } else {
+                sendBroadcastProgress(false);
+            }
+//            sendBroadcast(item, file);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -245,6 +257,17 @@ public class UploadService extends Service {
         builder.setSmallIcon(R.drawable.filestack__ic_menu_upload_fail_white);
 
         notificationManager.notify(errorNotificationId, builder.build());
+    }
+
+    private void sendBroadcastProgress(boolean finishedUpload) {
+        Intent intent = new Intent(FsConstants.BROADCAST_UPLOAD);
+        int progress = (int)(currentSize/maxSize * 100);
+        intent.putExtra("uploadProgress", progress);
+        intent.putExtra("uploadCurrentFile", currentFile);
+        intent.putExtra("uploadMaxFiles", maxFiles);
+        intent.putExtra("uploadFinished", finishedUpload);
+        intent.putExtra("uploadResult", response);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
     private void sendBroadcast(Selection selection, FileLink fileLink) {
