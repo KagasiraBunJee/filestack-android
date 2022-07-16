@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.widget.TextView;
 
-//import com.filestack.FileLink;
 import com.filestack.android.DataHashMap;
 
 import java.util.ArrayList;

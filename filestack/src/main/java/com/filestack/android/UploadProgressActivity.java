@@ -20,6 +20,7 @@ import android.support.v4.content.LocalBroadcastManager;
 import com.filestack.android.internal.UploadService;
 
 import com.filestack.FileLink;
+import com.filestack.android.internal.Util;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -58,6 +59,7 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
         mCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                Util.getClient().cancel();
                 onFinish();
             }
         });

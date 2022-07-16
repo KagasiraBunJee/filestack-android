@@ -107,9 +107,9 @@ public class UploadService extends Service {
 
     private void uploadFiles(List<Selection> selections, StorageOptions storeOpts) {
         maxFiles = selections.size();
+        maxSize = selections.size();
         currentFile = 0;
         currentSize = 0;
-        maxSize = selections.size();
         sendBroadcastProgress(false);
         for (Selection item : selections) {
 //            String name = item.getName();
@@ -165,12 +165,11 @@ public class UploadService extends Service {
             data.put("key", file.getKey());
             response.add(data);
             currentFile++;
-            if (currentFile == maxFiles - 1) {
+            if (currentFile >= maxFiles) {
                 sendBroadcastProgress(true);
             } else {
                 sendBroadcastProgress(false);
             }
-//            sendBroadcast(item, file);
         } catch (Exception e) {
             e.printStackTrace();
         }
