@@ -89,12 +89,16 @@ public class UploadService extends Service {
         if (storeOpts == null) {
             storeOpts = new StorageOptions.Builder().build();
         }
+        final StorageOptions storageOptions = storeOpts;
+        maxFiles = selections.size();
+        maxSize = selections.size();
+        currentFile = 0;
+        currentSize = 0;
 
         Notification serviceNotification =
-                progressNotification(0, selections.size(), "").build();
+                progressNotification(currentFile, maxFiles, 0, 100).build();
         startForeground(notificationId, serviceNotification);
 
-        final StorageOptions storageOptions = storeOpts;
         executor.execute(new Runnable() {
             @Override
             public void run() {
@@ -106,48 +110,38 @@ public class UploadService extends Service {
     }
 
     private void uploadFiles(List<Selection> selections, StorageOptions storeOpts) {
-        maxFiles = selections.size();
-        maxSize = selections.size();
-        currentFile = 0;
-        currentSize = 0;
         sendBroadcastProgress(false);
         for (Selection item : selections) {
-//            String name = item.getName();
-
-//            sendProgressNotification(i, total, name);
-
             uploadAsync(item, storeOpts);
-//            FileLink fileLink = upload(item, storeOpts);
-
-            // If upload fails, decrease total count and show error notification
-//            if (fileLink == null) {
-//                sendErrorNotification(item.getName());
-//                total--;
-//            } else {
-//                i++;
-//            }
-//
-//            sendProgressNotification(i, total, name);
-//            sendBroadcast(item, fileLink);
         }
+        sendBroadcastProgress(true);
+        Util.getSelectionSaver().clear();
     }
 
     private void uploadAsync(Selection selection, StorageOptions baseOptions) {
         System.out.println("start upload");
         try {
-            String provider = selection.getProvider();
-            String path = selection.getPath();
             Uri uri = selection.getUri();
-            final int size = selection.getSize();
             final String name = selection.getName();
             final String mimeType = selection.getMimeType();
             StorageOptions options = baseOptions.newBuilder()
                     .filename(name)
                     .mimeType(mimeType)
                     .build();
-            InputStream input = getContentResolver().openInputStream(uri);
 
-            FileLink file = Util.getClient().uploadAsync(input, size, false, options).doOnNext(new Consumer<Progress<FileLink>>() {
+            String provider = selection.getProvider();
+            Flowable<Progress<FileLink>> upload;
+
+            if (provider == Sources.CAMERA) {
+                String path = selection.getPath();
+                upload = Util.getClient().uploadAsync(path, false, options);
+            } else {
+                int size = selection.getSize();
+                InputStream input = getContentResolver().openInputStream(uri);
+                upload = Util.getClient().uploadAsync(input, size, false, options);
+            }
+
+            FileLink file = upload.doOnNext(new Consumer<Progress<FileLink>>() {
                 @Override
                 public void accept(Progress<FileLink> progress) throws Exception {
                     System.out.printf("%f%% uploaded %s\n", progress.getPercent(), name);
@@ -165,16 +159,12 @@ public class UploadService extends Service {
             data.put("key", file.getKey());
             response.add(data);
             currentFile++;
-            if (currentFile >= maxFiles) {
-                sendBroadcastProgress(true);
-            } else {
-                sendBroadcastProgress(false);
-            }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    // TODO: Remove as soon as possible
     private FileLink upload(Selection selection, StorageOptions baseOptions) {
         String provider = selection.getProvider();
         String path = selection.getPath();
@@ -220,31 +210,32 @@ public class UploadService extends Service {
         notificationManager.createNotificationChannel(channel);
     }
 
-    private void sendProgressNotification(int done, int total, String name) {
-        if (total == 0) {
+    private void sendProgressNotification(int currentFile, int filesCount, int progress, int maxProgress) {
+        if (filesCount == 0) {
             notificationManager.cancel(notificationId);
             return;
         }
         NotificationCompat.Builder builder;
-        if (total == done) {
+        if (filesCount == currentFile) {
             builder = new NotificationCompat.Builder(this, NOTIFY_CHANNEL_UPLOAD);
-            builder.setContentTitle(String.format(Locale.getDefault(), "Uploaded %d files", done));
+            builder.setContentTitle(String.format(Locale.getDefault(), "Uploaded %d files", filesCount));
             builder.setSmallIcon(R.drawable.filestack__ic_menu_upload_done_white);
             builder.setPriority(NotificationCompat.PRIORITY_HIGH);
         } else {
-            builder = progressNotification(done, total, name);
+            builder = progressNotification(currentFile, filesCount, progress, maxProgress);
         }
         builder.setPriority(NotificationCompat.PRIORITY_HIGH);
         notificationManager.notify(notificationId, builder.build());
     }
 
-    private NotificationCompat.Builder progressNotification(int done, int total, String currentFileName) {
+    private NotificationCompat.Builder progressNotification(int currentFile, int filesCount, int progress, int maxProgress) {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFY_CHANNEL_UPLOAD);
-        builder.setContentTitle(String.format(Locale.getDefault(), "Uploading %d/%d files", done, total));
+        builder.setContentTitle(String.format(Locale.getDefault(), "Uploaded %d/%d files", currentFile, filesCount));
         builder.setSmallIcon(R.drawable.filestack__ic_menu_upload_white);
-        builder.setContentText(currentFileName);
+        String filename = currentFile < filesCount ? Util.getSelectionSaver().getItems().get(currentFile).getName() : "";
+        builder.setContentText(filename);
         builder.setPriority(NotificationCompat.PRIORITY_HIGH);
-        builder.setProgress(total, done, false);
+        builder.setProgress(maxProgress, progress, false);
         return builder;
     }
 
@@ -267,6 +258,7 @@ public class UploadService extends Service {
         intent.putExtra("uploadFinished", finishedUpload);
         intent.putExtra("uploadResult", response);
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+        sendProgressNotification(currentFile, maxFiles, progress, 100);
     }
 
     private void sendBroadcast(Selection selection, FileLink fileLink) {

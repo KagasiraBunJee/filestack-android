@@ -27,12 +27,6 @@
                 app:popupTheme="@style/FilestackPopupOverlay" />
 
         </android.support.design.widget.AppBarLayout>
-        <ProgressBar
-            style="@android:style/Widget.ProgressBar.Horizontal"
-            android:visibility="gone"
-            android:id="@+id/progress_bar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
         <FrameLayout
             android:id="@+id/content"
             android:layout_width="match_parent"

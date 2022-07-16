@@ -53,9 +53,6 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
         mProgressBar.setProgress(0);
 
         mProgressLabel = findViewById(R.id.progress_label);
-//        mContentView =  findViewById(R.id.fullscreen_content);
-
-        // Set up the user interaction to manually show or hide the system UI.
         mCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -72,7 +69,8 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
     }
 
     private void onFinish() {
-//        setResult("", 0);
+        Util.getSelectionSaver().clear();
+        setResult(-100);
         finish();
     }
 

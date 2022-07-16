@@ -40,7 +40,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.filestack.CloudResponse;
@@ -339,9 +338,6 @@ public class FsActivity extends AppCompatActivity implements
     public void onEmptyChanged(boolean isEmpty) {
         invalidateOptionsMenu();
         if (!isEmpty && !isUploadingStarted) {
-            ProgressBar toolbar = findViewById(R.id.progress_bar);
-            toolbar.setVisibility(View.VISIBLE);
-            toolbar.setProgress(50);
 //            isUploadingStarted = true;
 //            Intent activityIntent = getIntent();
 //            ArrayList<Selection> selections = Util.getSelectionSaver().getItems();
