@@ -211,7 +211,7 @@ public class FsActivity extends AppCompatActivity implements
 //        if (drawer != null && drawer.isDrawerOpen(GravityCompat.START)) {
 //            drawer.closeDrawer(GravityCompat.START);
 //        } else if (backListener == null || !backListener.onBackPressed()) {
-//            super.onBackPressed();
+            super.onBackPressed();
 //        }
     }
 
