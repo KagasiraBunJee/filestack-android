@@ -1,17 +1,22 @@
 package com.filestack.android.internal;
 
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
+import android.provider.OpenableColumns;
 import android.support.v4.content.FileProvider;
 import android.support.v4.content.MimeTypeFilter;
+import android.util.Log;
 import android.widget.TextView;
 
 import com.filestack.Client;
 import com.filestack.Config;
 import com.filestack.Sources;
 import com.filestack.android.R;
+import com.filestack.android.Selection;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,6 +30,11 @@ import java.util.Map;
 
 /** Shared, static utility methods. */
 public class Util {
+
+    public static final int UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID = 1;
+    public static final int DEVICE_PICKER_ACTIVITY_REQUEST_ID = 2;
+    public static final int CAMERA_PICKER_ACTIVITY_REQUEST_ID = 3;
+
     private static final List<String> SOURCES_LIST = new ArrayList<>();
     private static final Map<String, SourceInfo> SOURCES_MAP = new HashMap<>();
 
@@ -184,6 +194,14 @@ public class Util {
         return File.createTempFile(fileName, ".mp4", storageDir);
     }
 
+    public static File storageDir() {
+        File mediaStorageDir = new File(Environment.getExternalStorageDirectory(), "vids");
+        if (! mediaStorageDir.exists()) {
+            mediaStorageDir.mkdirs();
+        }
+        return mediaStorageDir;
+    }
+
     // We need to get a URI from a file provider to avoid causing a FileUriExposedException
     // If we don't do this, we'll get the exception when sending the URI to the camera app
     // See the FileProvider example in https://developer.android.com/training/camera/photobasics
@@ -220,5 +238,32 @@ public class Util {
     /** Returns true if the MIME type is allowed by the filters. */
     public static boolean mimeAllowed(String[] filters, String mimeType) {
         return MimeTypeFilter.matches(mimeType, filters) != null;
+    }
+
+    public static Selection processUri(Uri uri, ContentResolver resolver) {
+        Cursor cursor = null;
+        try {
+            cursor = resolver.query(uri, null, null, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                int sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE);
+
+                // We can't upload files without knowing the size
+                if (cursor.isNull(sizeIndex)) {
+                    return null;
+                }
+
+                String name = cursor.getString(nameIndex);
+                int size = cursor.getInt(sizeIndex);
+                String mimeType = resolver.getType(uri);
+                return SelectionFactory.from(uri, size, mimeType, name);
+            } else {
+                return null;
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
     }
 }

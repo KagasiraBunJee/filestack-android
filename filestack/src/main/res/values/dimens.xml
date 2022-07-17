@@ -21,4 +21,5 @@
 
     <dimen name="filestack__grid_spacing">4dp</dimen>
     <integer name="filestack__grid_columns">3</integer>
+    <dimen name="fab_margin">16dp</dimen>
 </resources>

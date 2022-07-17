@@ -1,15 +1,32 @@
 package com.filestack.android;
 
+import static android.app.Activity.RESULT_FIRST_USER;
+import static android.app.Activity.RESULT_OK;
+import static android.content.Context.MODE_PRIVATE;
+import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
+import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
+
+import static com.filestack.android.internal.Util.CAMERA_PICKER_ACTIVITY_REQUEST_ID;
+import static com.filestack.android.internal.Util.DEVICE_PICKER_ACTIVITY_REQUEST_ID;
+import static com.filestack.android.internal.Util.UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID;
+
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.annotation.ColorInt;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -22,6 +39,7 @@ import android.support.v4.content.ContextCompat;
 import android.support.v4.graphics.ColorUtils;
 import android.support.v4.graphics.drawable.DrawableCompat;
 import android.support.v4.view.GravityCompat;
+import android.support.v4.content.FileProvider;
 import android.support.v4.view.MenuCompat;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v4.view.ViewCompat;
@@ -46,6 +64,7 @@ import com.filestack.CloudResponse;
 import com.filestack.Config;
 import com.filestack.Sources;
 import com.filestack.StorageOptions;
+import com.filestack.android.internal.AdvancedCameraActivity;
 import com.filestack.android.internal.BackButtonListener;
 import com.filestack.android.internal.CameraFragment;
 import com.filestack.android.internal.CloudAuthFragment;
@@ -56,7 +75,11 @@ import com.filestack.android.internal.SourceInfo;
 import com.filestack.android.internal.UploadService;
 import com.filestack.android.internal.Util;
 
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import io.reactivex.CompletableObserver;
@@ -65,16 +88,20 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
-/** UI to select and upload files from local and cloud sources.
- *
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+
+/**
+ * UI to select and upload files from local and cloud sources.
+ * <p>
  * This class should be launched through the creation and sending of an {{@link Intent}}.
  * Options are set by passing values to {@link Intent#putExtra(String, String)}.
  * The keys and descriptions for these options are defined in {{@link FsConstants}}.
- *
+ * <p>
  * There are two types of results from this activity, the files a user selects ({{@link Selection}})
  * and the metadata returned when these selections are uploaded ({{@link com.filestack.FileLink}}).
  * Automatic uploads can be disabled, in which case you will not receive any of the latter.
- *
+ * <p>
  * User selections are returned as an {{@link ArrayList}} of {{@link Selection}} objects to
  * {{@link android.app.Activity#onActivityResult(int, int, Intent)}}. To receive upload metadata,
  * you must define and register a {{@link android.content.BroadcastReceiver}}. The corresponding
@@ -83,13 +110,13 @@ import io.reactivex.schedulers.Schedulers;
  * {{@link com.filestack.FileLink}} objects passed to
  * {{@link android.content.BroadcastReceiver#onReceive(Context, Intent)}}. The key strings needed to
  * pull results from intents are defined in {{@link FsConstants}}.
- *
+ * <p>
  * The intent and broadcast mechanisms, and keys defined in {{@link FsConstants}}, are the contract
  * for this class. The actual code of this class should be considered internal implementation.
  */
 public class FsActivity extends AppCompatActivity implements
         SingleObserver<CloudResponse>, CompletableObserver, SelectionSaver.Listener,
-        NavigationView.OnNavigationItemSelectedListener {
+        NavigationView.OnNavigationItemSelectedListener, SourceSelectionListener {
 
     private static final String PREF_SESSION_TOKEN = "sessionToken";
     private static final String STATE_SELECTED_SOURCE = "selectedSource";
@@ -114,8 +141,8 @@ public class FsActivity extends AppCompatActivity implements
         Intent intent = getIntent();
         SharedPreferences preferences = getPreferences(MODE_PRIVATE);
 
-        setContentView(R.layout.filestack__activity_filestack);
-
+//        setContentView(R.layout.filestack__activity_filestack);
+        setContentView(R.layout.filestack__sources_list);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -124,32 +151,10 @@ public class FsActivity extends AppCompatActivity implements
             theme = Theme.defaultTheme();
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setStatusBarColor(theme.getAccentColor());
-        }
         getSupportActionBar().setTitle(theme.getTitle());
         toolbar.setTitleTextColor(theme.getBackgroundColor());
         toolbar.setSubtitleTextColor(ColorUtils.setAlphaComponent(theme.getBackgroundColor(), 220));
         toolbar.setBackgroundColor(theme.getAccentColor());
-        findViewById(R.id.content).setBackgroundColor(theme.getBackgroundColor());
-
-        drawer = findViewById(R.id.drawer_layout);
-        if (drawer != null) {
-            ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
-                    this, drawer, toolbar, R.string.filestack__nav_drawer_open, R.string.filestack__nav_drawer_close);
-            drawer.addDrawerListener(toggle);
-            toggle.syncState();
-        }
-
-        nav = findViewById(R.id.nav_view);
-        nav.setNavigationItemSelectedListener(this);
-        nav.setItemTextColor(ColorStateList.valueOf(theme.getAccentColor()));
-        nav.setBackgroundColor(theme.getBackgroundColor());
-
-        ((TextView) nav.getHeaderView(0).findViewById(R.id.filestack__drawer_title)).setTextColor(theme.getBackgroundColor());
-        nav.getHeaderView(0).findViewById(R.id.filestack__drawer_header_container).setBackgroundColor(theme.getAccentColor());
-
-        tintToolbar(toolbar, theme.getBackgroundColor());
         List<String> sources = (List<String>) intent.getSerializableExtra(FsConstants.EXTRA_SOURCES);
         if (sources == null) {
             sources = Util.getDefaultSources();
@@ -158,50 +163,29 @@ public class FsActivity extends AppCompatActivity implements
         allowMultipleFiles = intent.getBooleanExtra(FsConstants.EXTRA_ALLOW_MULTIPLE_FILES, true);
         showVersionInfo = intent.getBooleanExtra(FsConstants.EXTRA_DISPLAY_VERSION_INFORMATION, true);
 
-        String[] mimeTypes = intent.getStringArrayExtra(FsConstants.EXTRA_MIME_TYPES);
-        if (mimeTypes != null && sources.contains(Sources.CAMERA)) {
-            if (!Util.mimeAllowed(mimeTypes, "image/jpeg") && !Util.mimeAllowed(mimeTypes, "video/mp4")) {
-                sources.remove(Sources.CAMERA);
-                Log.w(TAG, "Hiding camera since neither image/jpeg nor video/mp4 MIME type is allowed");
-            }
-        }
+//        String[] mimeTypes = intent.getStringArrayExtra(FsConstants.EXTRA_MIME_TYPES);
+//        if (mimeTypes != null && sources.contains(Sources.CAMERA)) {
+//            if (!Util.mimeAllowed(mimeTypes, "image/jpeg") && !Util.mimeAllowed(mimeTypes, "video/mp4")) {
+//                sources.remove(Sources.CAMERA);
+//                Log.w(TAG, "Hiding camera since neither image/jpeg nor video/mp4 MIME type is allowed");
+//            }
+//        }
 
-        Menu menu = nav.getMenu();
-        int index = 0;
+        ArrayList<SourceInfo> selectedSources = new ArrayList<>();
         for (String source : sources) {
             int id = Util.getSourceIntId(source);
             SourceInfo info = Util.getSourceInfo(source);
-            MenuItem item = menu.add(Menu.NONE, id, index++, info.getTextId());
-            item.setCheckable(true);
-            item.setIcon(info.getIconId());
+            selectedSources.add(info);
         }
-        nav.setItemIconTintList(ColorStateList.valueOf(theme.getAccentColor()));
-
-        if (savedInstanceState == null) {
-            Config config = (Config) intent.getSerializableExtra(FsConstants.EXTRA_CONFIG);
-            String sessionToken = preferences.getString(PREF_SESSION_TOKEN, null);
-            Util.initializeClient(config, sessionToken);
-
-            Util.getSelectionSaver().clear();
-
-            selectedSource = sources.get(0);
-            nav.getMenu().performIdentifierAction(Util.getSourceIntId(selectedSource), 0);
-            if (drawer != null) {
-                drawer.openDrawer(Gravity.START);
-            }
-        } else {
-            selectedSource = savedInstanceState.getString(STATE_SELECTED_SOURCE);
-            shouldCheckAuth = savedInstanceState.getBoolean(STATE_SHOULD_CHECK_AUTH);
-        }
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        Util.getSelectionSaver().setItemChangeListener(this);
-        if (shouldCheckAuth) {
-            checkAuth();
-        }
+        RecyclerView recyclerView = (RecyclerView) findViewById(R.id.recyclerView);
+        SourceListAdapter adapter = new SourceListAdapter(selectedSources, this, theme);
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setAdapter(adapter);
+        Config config = (Config) intent.getSerializableExtra(FsConstants.EXTRA_CONFIG);
+        String sessionToken = preferences.getString(PREF_SESSION_TOKEN, null);
+        Util.initializeClient(config, sessionToken);
+        Util.getSelectionSaver().clear();
     }
 
     @Override
@@ -223,70 +207,26 @@ public class FsActivity extends AppCompatActivity implements
     }
 
     @Override
-    public void onAttachFragment(Fragment fragment) {
-        super.onAttachFragment(fragment);
-        try {
-            backListener = (BackButtonListener) fragment;
-        } catch (ClassCastException e) {
-            backListener = null;
-        }
-    }
-
-    @Override
     public void onBackPressed() {
-        if (drawer != null && drawer.isDrawerOpen(GravityCompat.START)) {
-            drawer.closeDrawer(GravityCompat.START);
-        } else if (backListener == null || !backListener.onBackPressed()){
-            super.onBackPressed();
-        }
+//        if (drawer != null && drawer.isDrawerOpen(GravityCompat.START)) {
+//            drawer.closeDrawer(GravityCompat.START);
+//        } else if (backListener == null || !backListener.onBackPressed()) {
+//            super.onBackPressed();
+//        }
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.action_logout) {
-            SourceInfo info = Util.getSourceInfo(selectedSource);
-            Util.getClient()
-                    .logoutCloudAsync(info.getId())
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(this);
-            return true;
-        } else if (id == R.id.action_upload) {
-            uploadSelections(Util.getSelectionSaver().getItems());
-        } else if (id == R.id.action_about) {
-            showAboutDialog();
-        }
-
         return super.onOptionsItemSelected(item);
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.filestack__menu, menu);
-        menu.findItem(R.id.action_about).setVisible(showVersionInfo);
-        for (int i = 0; i < menu.size(); i++) {
-            MenuItem item = menu.getItem(i);
-            Drawable drawable = DrawableCompat.wrap(item.getIcon());
-            if (drawable != null) {
-                drawable.setColorFilter(theme.getBackgroundColor(), PorterDuff.Mode.SRC_ATOP);
-                DrawableCompat.setTint(drawable, theme.getBackgroundColor());
-                item.setIcon(drawable);
-            }
-        }
-        return true;
+        return false;
     }
 
     @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
-        menu.findItem(R.id.action_upload).setVisible(!Util.getSelectionSaver().isEmpty());
-        return true;
-    }
-
-    @Override
-    public void onComplete() {
-        checkAuth();
-    }
+    public void onComplete() {}
 
     @Override
     public void onError(Throwable e) {
@@ -296,63 +236,48 @@ public class FsActivity extends AppCompatActivity implements
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
-        String source = Util.getSourceStringId(id);
-        Fragment fragment = null;
-
-        if (!source.equals(selectedSource)) {
-            Util.getSelectionSaver().clear();
-        }
-
-        SourceInfo sourceInfo = Util.getSourceInfo(source);
-        getSupportActionBar().setSubtitle(sourceInfo.getTextId());
-
-
-        nav.setCheckedItem(id);
-
-        switch (source) {
-            case Sources.CAMERA:
-                fragment = CameraFragment.newInstance(theme);
-                break;
-            case Sources.DEVICE:
-                fragment = LocalFilesFragment.newInstance(allowMultipleFiles, theme);
-                break;
-        }
-
-        selectedSource = source;
-        if (fragment == null) {
-            checkAuth();
-        } else {
-            shouldCheckAuth = false;
-            showFragment(fragment);
-        }
-
-        if (drawer != null) {
-            drawer.closeDrawer(GravityCompat.START);
-        }
-
-        return true;
+        return false;
     }
 
     @Override
-    public void onEmptyChanged(boolean isEmpty) {
-        invalidateOptionsMenu();
-        if (!isEmpty && !isUploadingStarted) {
-//            isUploadingStarted = true;
-//            Intent activityIntent = getIntent();
-//            ArrayList<Selection> selections = Util.getSelectionSaver().getItems();
-//            StorageOptions storeOpts = (StorageOptions) activityIntent
-//                    .getSerializableExtra(FsConstants.EXTRA_STORE_OPTS);
-//            Intent uploadIntent = new Intent(this, UploadService.class);
-//            uploadIntent.putExtra(FsConstants.EXTRA_STORE_OPTS, storeOpts);
-//            uploadIntent.putExtra(FsConstants.EXTRA_SELECTION_LIST, selections);
-//            ContextCompat.startForegroundService(this, uploadIntent);
+    public void onActivityResult(int requestCode, int resultCode, Intent resultData) {
+        if (requestCode == DEVICE_PICKER_ACTIVITY_REQUEST_ID && resultCode == RESULT_OK) {
+            ClipData clipData = resultData.getClipData();
+            ArrayList<Uri> uris = new ArrayList<>();
 
+            if (clipData != null) {
+                for (int i = 0; i < clipData.getItemCount(); i++) {
+                    uris.add(clipData.getItemAt(i).getUri());
+                }
+            } else {
+                uris.add(resultData.getData());
+            }
+
+            for (Uri uri : uris) {
+                Selection selection = Util.processUri(uri, getContentResolver());
+                Util.getSelectionSaver().toggleItem(selection);
+            }
+            uploadSelections(Util.getSelectionSaver().getItems());
+        }
+
+        if (requestCode == CAMERA_PICKER_ACTIVITY_REQUEST_ID && resultCode == RESULT_OK) {
+            uploadSelections(Util.getSelectionSaver().getItems());
+        }
+
+        if (requestCode == UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID) {
+            Intent data = new Intent();
+            data.putExtra(FsConstants.EXTRA_SELECTION_LIST, Util.getSelectionSaver().getItems());
+            setResult(RESULT_OK, data);
+            finish();
         }
     }
 
     @Override
-    public void onSubscribe(Disposable d) { }
+    public void onEmptyChanged(boolean isEmpty) {}
+
+    @Override
+    public void onSubscribe(Disposable d) {
+    }
 
     @Override
     public void onSuccess(CloudResponse contents) {
@@ -360,30 +285,15 @@ public class FsActivity extends AppCompatActivity implements
 
         // TODO Switching source views shouldn't depend on a network request
 
-        if (authUrl != null) {
-            shouldCheckAuth = true;
-            CloudAuthFragment fragment = CloudAuthFragment.create(selectedSource, authUrl, theme);
-            showFragment(fragment);
-        } else {
-            shouldCheckAuth = false;
-            CloudListFragment fragment = CloudListFragment.create(selectedSource, allowMultipleFiles, theme);
-            showFragment(fragment);
-        }
-    }
-
-    private void showFragment(Fragment fragment) {
-        getSupportFragmentManager().beginTransaction()
-                .replace(R.id.content, fragment)
-                .commit();
-    }
-
-    private void checkAuth() {
-        SourceInfo info = Util.getSourceInfo(selectedSource);
-        Util.getClient()
-                .getCloudItemsAsync(info.getId(), "/")
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(this);
+//        if (authUrl != null) {
+//            shouldCheckAuth = true;
+//            CloudAuthFragment fragment = CloudAuthFragment.create(selectedSource, authUrl, theme);
+//            showFragment(fragment);
+//        } else {
+//            shouldCheckAuth = false;
+//            CloudListFragment fragment = CloudListFragment.create(selectedSource, allowMultipleFiles, theme);
+//            showFragment(fragment);
+//        }
     }
 
     private void uploadSelections(ArrayList<Selection> selections) {
@@ -400,31 +310,106 @@ public class FsActivity extends AppCompatActivity implements
 
         Intent uploadProgressIntent = new Intent(this, UploadProgressActivity.class);
         uploadProgressIntent.putExtra("uploadMaxFiles", selections.size());
-        startActivityForResult(uploadProgressIntent, 0);
-//        Intent data = new Intent();
-//        data.putExtra(FsConstants.EXTRA_SELECTION_LIST, selections);
-//        setResult(RESULT_OK, data);
-//        finish();
+        startActivityForResult(uploadProgressIntent, UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID);
     }
 
-    private void showAboutDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.filestack__picker_title)
-                .setMessage(BuildConfig.FILESTACK_ANDROID_VERSION)
-                .show();
-    }
-
-    @SuppressLint("RestrictedApi")
-    private void tintToolbar(Toolbar toolbar, @ColorInt int color) {
-        Drawable drawable = DrawableCompat.wrap(toolbar.getOverflowIcon());
-        DrawableCompat.setTint(drawable.mutate(), color);
-        toolbar.setOverflowIcon(drawable);
-
-        for (int i = 0; i < toolbar.getChildCount(); i++) {
-            View child = toolbar.getChildAt(i);
-            if (child instanceof AppCompatImageButton) {
-                ((AppCompatImageButton) child).setSupportImageTintList(ColorStateList.valueOf(color));
-            }
+    @Override
+    public void onSourceSelected(String id) {
+        switch (id) {
+            case Sources.CAMERA:
+                startCameraPicker();
+                break;
+            case Sources.DEVICE:
+                startFilePicker();
+                break;
+            default:
+                break;
         }
+    }
+    private static final String TYPE_PHOTO = "photo";
+    private static final String TYPE_VIDEO = "video";
+    private static final String PREF_PATH = "path";
+    private static final String PREF_NAME= "name";
+    private static final String ARG_THEME = "theme";
+
+    private void startCameraPicker() {
+        Intent cameraIntent = new Intent(this, AdvancedCameraActivity.class);
+        startActivityForResult(cameraIntent, CAMERA_PICKER_ACTIVITY_REQUEST_ID);
+//        int id = view.getId();
+//        Intent cameraIntent = null;
+//
+//        cameraIntent = createCameraIntent(TYPE_VIDEO);
+//
+//        startActivityForResult(cameraIntent, CAMERA_PICKER_ACTIVITY_REQUEST_ID);
+//        Intent takeVideoFromCameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+//        takeVideoFromCameraIntent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+//        takeVideoFromCameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, getOutputMediaFile(MEDIA_TYPE_IMAGE));
+//        takeVideoFromCameraIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+//        startActivityForResult(takeVideoFromCameraIntent, CAMERA_PICKER_ACTIVITY_REQUEST_ID);
+    }
+
+    public Uri getOutputMediaFile(int type)
+    {
+        if(Environment.getExternalStorageState() != null) {
+            File mediaStorageDir = Util.storageDir();
+            /* Create a media file name */
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+
+            File mediaFile;
+            if (type == MEDIA_TYPE_IMAGE) {
+                mediaFile = new File(mediaStorageDir.getPath(), "PHOTO_"+ timeStamp + ".jpeg");
+            } else {
+                mediaFile = new File(mediaStorageDir.getPath(), "VID_"+ timeStamp + ".mp4");
+            }
+            return FileProvider.getUriForFile(this, getPackageName() + ".provider", mediaFile);
+        }
+        return null;
+    }
+
+//    private Intent createCameraIntent(String source) {
+//        Intent intent = null;
+//        File file = null;
+//
+//        SharedPreferences prefs = context.getSharedPreferences(getClass().getName(), MODE_PRIVATE);
+//
+//        try {
+//            switch (source) {
+//                case TYPE_PHOTO:
+//                    intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+//                    file = Util.createPictureFile(context);
+//                    break;
+//                case TYPE_VIDEO:
+//                    intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+//                    file = Util.createMovieFile(context);
+//                    break;
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//
+//        if (file != null) {
+//            String path = file.getAbsolutePath();
+//            String name = file.getName();
+//            prefs.edit().putString(PREF_PATH, path).putString(PREF_NAME, name).apply();
+//            Uri uri = Util.getUriForInternalMedia(getContext(), file);
+//            intent.putExtra(MediaStore.EXTRA_OUTPUT, uri);
+//        }
+//
+//        return intent;
+//    }
+
+    private void startFilePicker() {
+        final Intent intent;
+        intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, allowMultipleFiles);
+        intent.setType("*/*");
+
+        Intent launchIntent = getIntent();
+        String[] mimeTypes = launchIntent.getStringArrayExtra(FsConstants.EXTRA_MIME_TYPES);
+        if (mimeTypes != null) {
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+        }
+        startActivityForResult(intent, DEVICE_PICKER_ACTIVITY_REQUEST_ID);
     }
 }

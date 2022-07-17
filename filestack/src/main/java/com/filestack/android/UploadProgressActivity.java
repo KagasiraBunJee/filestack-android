@@ -1,5 +1,7 @@
 package com.filestack.android;
 
+import static com.filestack.android.internal.Util.UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID;
+
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -28,7 +30,7 @@ import com.filestack.android.internal.Util;
  */
 
 interface UploadProgressListener {
-    void onProgressUpdate(int progress, int currentFile, int maxFiles);
+    void onProgressUpdate(int progress, int currentFile, int maxFiles, boolean uploadFinished);
 }
 
 public class UploadProgressActivity extends AppCompatActivity implements UploadProgressListener {
@@ -61,7 +63,7 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
             }
         });
 
-        onProgressUpdate(0, 0, intent.getIntExtra("uploadMaxFiles", 0));
+        onProgressUpdate(0, 0, intent.getIntExtra("uploadMaxFiles", 0), false);
 
         IntentFilter intentFilter = new IntentFilter(FsConstants.BROADCAST_UPLOAD);
         UploadStatusReceiver receiver = new UploadStatusReceiver(this);
@@ -69,8 +71,6 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
     }
 
     private void onFinish() {
-        Util.getSelectionSaver().clear();
-        setResult(-100);
         finish();
     }
 
@@ -81,10 +81,14 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
     }
 
     @Override
-    public void onProgressUpdate(int progress, int currentFile, int maxFiles) {
+    public void onProgressUpdate(int progress, int currentFile, int maxFiles, boolean finished) {
         mProgressBar.setProgress(progress);
         String progressLabel = String.format("Uploading files: %d/%d", currentFile, maxFiles);
         mProgressLabel.setText(progressLabel);
+        if (finished) {
+            setResult(UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID);
+            onFinish();
+        }
     }
 
     public class UploadStatusReceiver extends BroadcastReceiver {
@@ -102,7 +106,8 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
             int maxFiles = intent.getIntExtra("uploadMaxFiles", 0);
             int currentFile = intent.getIntExtra("uploadCurrentFile", 0);
             int progress = intent.getIntExtra("uploadProgress", 0);
-            listener.onProgressUpdate(progress, currentFile, maxFiles);
+            boolean uploadFinished = intent.getBooleanExtra("uploadFinished", false);
+            listener.onProgressUpdate(progress, currentFile, maxFiles, uploadFinished);
         }
     }
 }

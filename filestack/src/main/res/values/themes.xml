@@ -1,5 +1,7 @@
 <resources>
-  <style name="Theme.Filestackandroid" parent="Theme.AppCompat.Light"/>
+
+    <style name="Theme.Filestackandroid" parent="Theme.AppCompat.Light" />
+
     <style name="Theme.Filestackandroid.Fullscreen" parent="Theme.Filestackandroid">
         <item name="android:actionBarStyle">
             @style/Widget.Theme.Filestackandroid.ActionBar.Fullscreen
@@ -12,4 +14,13 @@
         <item name="fullscreenBackgroundColor">@color/light_blue_600</item>
         <item name="fullscreenTextColor">@color/light_blue_A200</item>
     </style>
+
+    <style name="Theme.Filestackandroid.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme.Filestackandroid.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
+
+    <style name="Theme.Filestackandroid.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
 </resources>

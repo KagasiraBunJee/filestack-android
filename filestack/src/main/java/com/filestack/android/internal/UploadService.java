@@ -132,7 +132,7 @@ public class UploadService extends Service {
             String provider = selection.getProvider();
             Flowable<Progress<FileLink>> upload;
 
-            if (provider == Sources.CAMERA) {
+            if (provider.equals(Sources.CAMERA)) {
                 String path = selection.getPath();
                 upload = Util.getClient().uploadAsync(path, false, options);
             } else {
@@ -145,7 +145,7 @@ public class UploadService extends Service {
                 @Override
                 public void accept(Progress<FileLink> progress) throws Exception {
                     System.out.printf("%f%% uploaded %s\n", progress.getPercent(), name);
-                    currentSize = currentFile > 0 ? (currentFile - 1) + progress.getPercent() : progress.getPercent();
+                    currentSize = currentFile + progress.getPercent();
                     sendBroadcastProgress(false);
                 }
             }).blockingLast().getData();

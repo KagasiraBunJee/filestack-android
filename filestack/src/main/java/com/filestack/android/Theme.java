@@ -17,12 +17,14 @@ public class Theme implements Parcelable {
     private final int backgroundColor;
     private final int accentColor;
     private final int textColor;
+    private final int itemTextColor;
 
     private Theme(Builder builder) {
         this.title = builder.title;
         this.backgroundColor = builder.backgroundColor;
         this.accentColor = builder.accentColor;
         this.textColor = builder.textColor;
+        this.itemTextColor = builder.itemTextColor;
     }
 
     public String getTitle() {
@@ -41,11 +43,16 @@ public class Theme implements Parcelable {
         return textColor;
     }
 
+    public int getItemTextColor() {
+        return itemTextColor;
+    }
+
     public static class Builder {
         String title = "Filestack Picker";
         int backgroundColor = Color.WHITE;
         int accentColor = Color.parseColor("#FF9800");
         int textColor = Color.parseColor("#89000000");
+        int itemTextColor = Color.parseColor("#2E3538");
 
         /**
          * Title of the Picker.
@@ -63,6 +70,11 @@ public class Theme implements Parcelable {
          */
         public Builder backgroundColor(@ColorInt int backgroundColor) {
             this.backgroundColor = backgroundColor;
+            return this;
+        }
+
+        public Builder itemTextColor(@ColorInt int itemTextColor) {
+            this.itemTextColor = itemTextColor;
             return this;
         }
 
@@ -98,6 +110,7 @@ public class Theme implements Parcelable {
         backgroundColor = in.readInt();
         accentColor = in.readInt();
         textColor = in.readInt();
+        itemTextColor = in.readInt();
     }
 
     @Override
@@ -106,6 +119,7 @@ public class Theme implements Parcelable {
         dest.writeInt(backgroundColor);
         dest.writeInt(accentColor);
         dest.writeInt(textColor);
+        dest.writeInt(itemTextColor);
     }
 
     @Override
