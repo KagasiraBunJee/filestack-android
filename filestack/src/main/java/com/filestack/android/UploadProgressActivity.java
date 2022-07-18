@@ -55,7 +55,7 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
         mCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Util.getClient().cancel();
+                finishUploadService();
                 onFinish();
             }
         });
@@ -71,16 +71,20 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
         finish();
     }
 
+    private void finishUploadService() {
+        Util.getClient().cancel();
+        stopService(new Intent(this, UploadService.class));
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
-        stopService(new Intent(this, UploadService.class));
     }
 
     @Override
     public void onProgressUpdate(int progress, int currentFile, int maxFiles, boolean finished) {
         mProgressBar.setProgress(progress);
-        String progressLabel = String.format("Uploading files: %d/%d", currentFile, maxFiles);
+        String progressLabel = String.format("Uploaded files: %d/%d", currentFile, maxFiles);
         mProgressLabel.setText(progressLabel);
         if (finished) {
             setResult(UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID);

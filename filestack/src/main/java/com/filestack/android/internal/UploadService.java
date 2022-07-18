@@ -36,6 +36,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import io.reactivex.Flowable;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
 
 /**
@@ -51,7 +53,6 @@ public class UploadService extends Service {
     private static final String NOTIFY_CHANNEL_UPLOAD = "uploadsChannel";
 
     private Executor executor = Executors.newSingleThreadExecutor();
-    Flowable<Progress<FileLink>> upload;
 
     private NotificationManager notificationManager;
     private int notificationId;
@@ -64,6 +65,8 @@ public class UploadService extends Service {
     private int currentFile = 0;
     private int maxFiles = 0;
 
+    Disposable upload;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -71,15 +74,14 @@ public class UploadService extends Service {
         errorNotificationId = notificationId + 1;
 
         notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            createNotificationChannel();
-        }
+        createNotificationChannel();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
         Util.getSelectionSaver().clear();
+        Util.getClient().cancel();
     }
 
     @Nullable
@@ -115,6 +117,8 @@ public class UploadService extends Service {
         return START_STICKY;
     }
 
+
+
     private void uploadFiles(List<Selection> selections, StorageOptions storeOpts) {
         sendBroadcastProgress(false);
         for (Selection item : selections) {
@@ -145,15 +149,22 @@ public class UploadService extends Service {
                 InputStream input = getContentResolver().openInputStream(uri);
                 upload = Util.getClient().uploadAsync(input, size, false, options);
             }
-
-            FileLink file = upload.doOnNext(new Consumer<Progress<FileLink>>() {
+            FileLink file = upload
+                    .doOnNext(new Consumer<Progress<FileLink>>() {
                 @Override
                 public void accept(Progress<FileLink> progress) throws Exception {
                     System.out.printf("%f%% uploaded %s\n", progress.getPercent(), name);
                     currentSize = currentFile + progress.getPercent();
                     sendBroadcastProgress(false);
                 }
-            }).blockingLast().getData();
+            })
+                    .doOnError(new Consumer<Throwable>() {
+                        @Override
+                        public void accept(Throwable throwable) throws Exception {
+                            throwable.printStackTrace();
+                        }
+                    })
+                    .blockingLast().getData();
 
             DataHashMap data = new DataHashMap();
             data.put("container", file.getContainer());
@@ -207,7 +218,7 @@ public class UploadService extends Service {
     private void createNotificationChannel() {
         CharSequence name = getString(R.string.filestack__notify_channel_upload_name);
         String description = getString(R.string.filestack__notify_channel_upload_description);
-        int importance = NotificationManager.IMPORTANCE_DEFAULT;
+        int importance = NotificationManager.IMPORTANCE_LOW;
 
         NotificationChannel channel =
                 new NotificationChannel(NOTIFY_CHANNEL_UPLOAD, name, importance);
@@ -234,10 +245,11 @@ public class UploadService extends Service {
     }
 
     private NotificationCompat.Builder progressNotification(int currentFile, int filesCount, int progress, int maxProgress) {
+        ArrayList<Selection> items = Util.getSelectionSaver().getItems();
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFY_CHANNEL_UPLOAD);
         builder.setContentTitle(String.format(Locale.getDefault(), "Uploaded %d/%d files", currentFile, filesCount));
         builder.setSmallIcon(R.drawable.filestack__ic_menu_upload_white);
-        String filename = currentFile < filesCount ? Util.getSelectionSaver().getItems().get(currentFile).getName() : "";
+        String filename = currentFile < filesCount && items.size() > 0 ? items.get(currentFile).getName() : "";
         builder.setContentText(filename);
         builder.setPriority(NotificationCompat.PRIORITY_HIGH);
         builder.setProgress(maxProgress, progress, false);
