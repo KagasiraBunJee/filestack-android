@@ -264,7 +264,7 @@ public class FsActivity extends AppCompatActivity implements
             uploadSelections(Util.getSelectionSaver().getItems());
         }
 
-        if (requestCode == UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID) {
+        if (requestCode == UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID && resultCode == 1) {
             Intent data = new Intent();
             data.putExtra(FsConstants.EXTRA_SELECTION_LIST, Util.getSelectionSaver().getItems());
             setResult(RESULT_OK, data);

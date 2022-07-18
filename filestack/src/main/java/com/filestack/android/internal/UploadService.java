@@ -64,6 +64,7 @@ public class UploadService extends Service {
     private double currentSize = 0;
     private int currentFile = 0;
     private int maxFiles = 0;
+    private boolean uploadCancelled = false;
 
     Disposable upload;
 
@@ -80,6 +81,7 @@ public class UploadService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        uploadCancelled = true;
         Util.getSelectionSaver().clear();
         Util.getClient().cancel();
     }
@@ -267,12 +269,15 @@ public class UploadService extends Service {
     }
 
     private void sendBroadcastProgress(boolean finishedUpload) {
+        if (uploadCancelled) {
+            return;
+        }
         Intent intent = new Intent(FsConstants.BROADCAST_UPLOAD);
         int progress = (int)(currentSize/maxSize * 100);
         intent.putExtra("uploadProgress", progress);
         intent.putExtra("uploadCurrentFile", currentFile);
         intent.putExtra("uploadMaxFiles", maxFiles);
-        intent.putExtra("uploadFinished", finishedUpload);
+        intent.putExtra("uploadFinished", response.size() > 0 ? finishedUpload : false);
         intent.putExtra("uploadResult", response);
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
         sendProgressNotification(currentFile, maxFiles, progress, 100);

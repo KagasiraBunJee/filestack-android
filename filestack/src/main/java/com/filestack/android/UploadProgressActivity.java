@@ -87,7 +87,7 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
         String progressLabel = String.format("Uploaded files: %d/%d", currentFile, maxFiles);
         mProgressLabel.setText(progressLabel);
         if (finished) {
-            setResult(UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID);
+            setResult(1);
             onFinish();
         }
     }
