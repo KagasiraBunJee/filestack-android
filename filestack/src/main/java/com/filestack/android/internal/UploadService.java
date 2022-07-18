@@ -76,6 +76,12 @@ public class UploadService extends Service {
         }
     }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Util.getSelectionSaver().clear();
+    }
+
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
@@ -115,7 +121,6 @@ public class UploadService extends Service {
             uploadAsync(item, storeOpts);
         }
         sendBroadcastProgress(true);
-        Util.getSelectionSaver().clear();
     }
 
     private void uploadAsync(Selection selection, StorageOptions baseOptions) {

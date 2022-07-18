@@ -310,6 +310,7 @@ public class FsActivity extends AppCompatActivity implements
 
         Intent uploadProgressIntent = new Intent(this, UploadProgressActivity.class);
         uploadProgressIntent.putExtra("uploadMaxFiles", selections.size());
+        uploadProgressIntent.putExtra(FsConstants.EXTRA_THEME, theme);
         startActivityForResult(uploadProgressIntent, UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID);
     }
 

@@ -2,26 +2,21 @@ package com.filestack.android;
 
 import static com.filestack.android.internal.Util.UPLOAD_PROGRESS_ACTIVITY_REQUEST_ID;
 
-import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.ColorStateList;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.support.v4.content.LocalBroadcastManager;
 import com.filestack.android.internal.UploadService;
 
-import com.filestack.FileLink;
 import com.filestack.android.internal.Util;
 
 /**
@@ -46,13 +41,15 @@ public class UploadProgressActivity extends AppCompatActivity implements UploadP
         super.onCreate(savedInstanceState);
         Intent intent = getIntent();
 
-        setContentView(R.layout.activity_upload_progress);
+        setContentView(R.layout.filestack__activity_upload_progress);
         getSupportActionBar().setTitle(R.string.filestack__title_upload);
         mVisible = true;
         mControlsView =  findViewById(R.id.fullscreen_content_controls);
         mCancelButton = findViewById(R.id.cancel_button);
         mProgressBar = findViewById(R.id.progress_bar);
         mProgressBar.setProgress(0);
+        Theme theme = intent.getParcelableExtra(FsConstants.EXTRA_THEME);
+        mProgressBar.setProgressTintList(ColorStateList.valueOf(theme.getAccentColor()));
 
         mProgressLabel = findViewById(R.id.progress_label);
         mCancelButton.setOnClickListener(new View.OnClickListener() {
